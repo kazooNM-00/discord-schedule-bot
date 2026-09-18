@@ -1,11 +1,264 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <title>Test</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>日程調整アプリ</title>
+  <style>
+    :root {
+      --bg-color: #313338;
+      --card-bg: #2b2d31;
+      --accent-color: #5865f2;
+      --accent-hover: #4752c4;
+      --text-color: #f2f3f5;
+      --sub-text: #b5bac1;
+      --border-color: #1e1f22;
+      --success-color: #23a55a;
+      --danger-color: #f23f43;
+    }
+
+    body {
+      font-family: 'gg sans', 'Noto Sans JP', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: var(--card-bg);
+      padding: 24px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    h1, h2 {
+      margin-top: 0;
+      color: var(--text-color);
+    }
+
+    .section {
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+      color: var(--sub-text);
+      font-size: 14px;
+    }
+
+    input[type="text"], input[type="date"], select {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 12px;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      background-color: #1e1f22;
+      color: var(--text-color);
+      box-sizing: border-box;
+      font-size: 14px;
+    }
+
+    .candidate-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .candidate-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #1e1f22;
+      padding: 8px 12px;
+      border-radius: 4px;
+    }
+
+    .status-btns {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      background-color: var(--accent-color);
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 4px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn:hover {
+      background-color: var(--accent-hover);
+    }
+
+    .btn-small {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+
+    .btn-ok { background-color: var(--success-color); }
+    .btn-ng { background-color: var(--danger-color); }
+    .btn-maybe { background-color: #f0b232; }
+
+    .result-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+
+    .result-table th, .result-table td {
+      border: 1px solid var(--border-color);
+      padding: 8px;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .result-table th {
+      background-color: #1e1f22;
+    }
+  </style>
 </head>
-<body style="background-color: #5865F2; color: white; text-align: center; padding-top: 50px;">
-    <h1>🎉 テスト画面の表示に成功しました！</h1>
-    <p>HTMLとngrokの通信は正常に機能しています。</p>
+<body>
+
+  <div class="container">
+    <h1>📅 日程調整ツール</h1>
+
+    <!-- 1. イベント作成エリア -->
+    <div class="section">
+      <h2>イベントを作成する</h2>
+      <label for="event-title">イベント名</label>
+      <input type="text" id="event-title" placeholder="例: 今週末の会議 / ゲーム大会">
+
+      <label for="candidate-date">候補日を追加</label>
+      <div style="display: flex; gap: 8px;">
+        <input type="date" id="candidate-date">
+        <button class="btn btn-small" onclick="addCandidate()">追加</button>
+      </div>
+
+      <div id="candidate-container" class="candidate-list"></div>
+
+      <button class="btn" style="width: 100%;" onclick="createEvent()">日程調整を開始する</button>
+    </div>
+
+    <!-- 2. 回答エリア（例表示） -->
+    <div class="section">
+      <h2>出欠を回答する</h2>
+      <p id="current-event-name" style="color: var(--sub-text);">イベント名: （未作成）</p>
+
+      <div id="response-list" class="candidate-list">
+        <!-- 候補日がここに表示されます -->
+      </div>
+
+      <button class="btn btn-ok" style="width: 100%; margin-top: 12px;" onclick="submitResponse()">回答を送信する</button>
+    </div>
+
+    <!-- 3. 集計結果一覧 -->
+    <div class="section" style="border-bottom: none;">
+      <h2>現在の集計状況</h2>
+      <table class="result-table">
+        <thead>
+          <tr>
+            <th>候補日時</th>
+            <th>⭕ 参加</th>
+            <th>🔺 検討中</th>
+            <th>❌ 不参加</th>
+          </tr>
+        </thead>
+        <tbody id="result-body">
+          <tr>
+            <td colspan="4" style="color: var(--sub-text);">まだ回答がありません</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const candidates = [];
+
+    // 候補日を追加する関数
+    function addCandidate() {
+      const dateInput = document.getElementById('candidate-date');
+      const val = dateInput.value;
+      if (!val) return;
+
+      if (!candidates.includes(val)) {
+        candidates.push(val);
+        renderCandidates();
+      }
+      dateInput.value = '';
+    }
+
+    // 追加された候補日を画面に表示
+    function renderCandidates() {
+      const container = document.getElementById('candidate-container');
+      container.innerHTML = '';
+      candidates.forEach((date, idx) => {
+        const item = document.createElement('div');
+        item.className = 'candidate-item';
+        item.innerHTML = `
+          <span>${date}</span>
+          <button class="btn btn-small btn-ng" onclick="removeCandidate(${idx})">削除</button>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function removeCandidate(index) {
+      candidates.splice(index, 1);
+      renderCandidates();
+    }
+
+    // イベント作成処理のダミー関数
+    function createEvent() {
+      const title = document.getElementById('event-title').value;
+      if (!title) {
+        alert('イベント名を入力してください！');
+        return;
+      }
+      if (candidates.length === 0) {
+        alert('候補日を1つ以上追加してください！');
+        return;
+      }
+
+      document.getElementById('current-event-name').innerText = `イベント名: ${title}`;
+
+      // 回答欄を生成
+      const responseList = document.getElementById('response-list');
+      responseList.innerHTML = '';
+      candidates.forEach(date => {
+        const item = document.createElement('div');
+        item.className = 'candidate-item';
+        item.innerHTML = `
+          <span>${date}</span>
+          <div class="status-btns">
+            <select>
+              <option value="ok">⭕ 参加</option>
+              <option value="maybe">🔺 検討中</option>
+              <option value="ng">❌ 不参加</option>
+            </select>
+          </div>
+        `;
+        responseList.appendChild(item);
+      });
+
+      alert('イベントを作成しました！下部で回答を試せます。');
+    }
+
+    function submitResponse() {
+      alert('回答を送信しました！（※現在はUIテスト用のため保存はされません）');
+    }
+  </script>
 </body>
 </html>
