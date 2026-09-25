@@ -200,10 +200,15 @@ async def create(interaction: discord.Interaction):
         ephemeral=True
     )
 
+GUILD_ID = 1494540447572557964  # ←ここにコピーしたサーバーIDを入れる
+
 @client.event
 async def on_ready():
-    await tree.sync()
-    print(f"Logged in as {client.user}")
+    guild = discord.Object(id=GUILD_ID)
+    # グローバル定義をこのサーバー専用にコピーして即時同期
+    tree.copy_global_to(guild=guild)
+    await tree.sync(guild=guild)
+    print(f"Logged in as {client.user} (Guild synced successfully!)")
 
 # --- 5. 起動処理 ---
 async def main():
